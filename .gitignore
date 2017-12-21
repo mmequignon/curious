@@ -100,3 +100,7 @@ sandbox/
 
 # mypy
 .mypy_cache/
+
+#plots
+plots/*
+!plots/.gitignore
