@@ -52,11 +52,11 @@ class TicTacToe():
 
     def representation(self):
         separator = "-------"
+        player1_position = self.turn % 2 == 0 and 0 or 1
         print(separator)
         for l in range(0, 9, 3):
-            line = [self.table[0][l+c] and "X" or
-                    self.table[-1][l+c] and "O" or
+            line = [self.table[player1_position][l+c] and "X" or
+                    self.table[player1_position - 1][l+c] and "O" or
                     " " for c in range(3)]
             print("|%s|%s|%s|" % (line[0], line[1], line[2]))
             print(separator)
-        print()
