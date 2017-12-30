@@ -20,6 +20,8 @@ class TicTacToe():
         diagonals = [[0, 4, 8], [2, 4, 6]]
         self.lines = horizontals + verticals + diagonals
         self.turn = 0
+        self.sequence = []
+        self.winner = False
 
     def game_is_won(self):
         """Returns True is a player won the game, else False.
@@ -44,11 +46,18 @@ class TicTacToe():
         self.table[0], self.table[1] = self.table[1], self.table[0]
 
     def end_turn(self):
-        self.swap()
-        self.turn += 1
+        if self.game_is_won():
+            self.winner = self.turn % 2
+        else:
+            self.swap()
+            self.turn += 1
 
     def move(self, case):
         self.table[0][case] = True
+        self.sequence.append(case)
+
+    def get_sequence(self):
+        return "".join(str(i) for i in self.sequence)
 
     def representation(self):
         separator = "-------"

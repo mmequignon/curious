@@ -13,11 +13,10 @@ class Explorator():
         valid_moves = game.valid_moves()
         move = random.choice(valid_moves)
         game.move(move)
+        game.end_turn()
         played_moves.append(move)
         if game.game_is_over():
-            winner = game.turn % 2 if game.game_is_won() else False
-            return played_moves, winner
-        game.end_turn()
+            return played_moves, game.winner
         return self.explore(game, played_moves)
 
     def __init__(self):
