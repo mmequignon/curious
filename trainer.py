@@ -2,19 +2,29 @@
 
 import random
 import re
+
 import torch
 import numpy
+
 from tic_tac_toe import TicTacToe
 
 
 class Trainer():
 
     def __init__(self):
+        """Gets each item from the dataset file and splits that dataset into
+        two sets. One for training, one for testing.
+        """
+        split_ratio = 0.0001
         filename = "data/tic-tac-toe-dataset.txt"
         self.dataset = []
         with open(filename, "r") as f:
             for line in f:
                 self.dataset.append(line.split())
+        random.shuffle(self.dataset)
+        split_indice = int(len(self.dataset) * split_ratio)
+        self.trainset = self.dataset[:split_indice]
+        self.testset = self.dataset[split_indice:]
 
     def get_leaves(self, parent):
         regex = re.compile("%s[0-9]+" % (parent))
@@ -63,11 +73,34 @@ class Trainer():
         n = numpy.array(three_dim_array)
         return torch.from_numpy(n)
 
+    def split_table(self, table):
+        return (table[:, :2, :2], table[:, :2, 1:],
+                table[:, 1:, :2], table[:, 1:, 1:])
+
+
+def chunker(data, size=2000):
+    return [data[i:i+size] for i in range(0, len(data), size)]
+
 
 if __name__ == "__main__":
     trainer = Trainer()
-    game = TicTacToe()
-    trunk = random.choice(trainer.dataset)[0][:3]
-    game = trainer.get_game_from_sequence(trunk)
-    print(trainer.get_tensor_from_game(game))
-    print(game.representation())
+    chunk_size = 30
+    # Traning phase
+    chunks = chunker(trainer.dataset, chunk_size)
+    for epoch, chunk in enumerate(chunks):
+        current_loss = 0
+        for sequence, winner in chunk:
+            # Regarding the fact that each sequence of move provided by the
+            # dataset represents an ended game, we must slice them.
+            index = random.randrange(0, len(sequence) - 2)
+            root = sequence[index]
+            game = trainer.get_game_from_sequence(root)
+            branches = game.valid_moves()
+            best_branch = trainer.best_branch(root, branches)
+            # TODO: for the moment, randomly selects branch.
+            choice = random.choice(branches)
+            if best_branch != choice:
+                current_loss += 1
+        rate = (current_loss / chunk_size) * 100
+        # TODO: output in a file, for pyplot.
+        print("iteration : %s, loss rate : %s" % (epoch, rate))
