@@ -11,6 +11,8 @@ from tic_tac_toe import TicTacToe
 
 class Trainer():
 
+    __slots__ = ["dataset", "trainset", "testset"]
+
     def __init__(self):
         """Gets each item from the dataset file and splits that dataset into
         two sets. One for training, one for testing.

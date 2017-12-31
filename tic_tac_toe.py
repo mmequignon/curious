@@ -13,6 +13,8 @@ class TicTacToe():
     Player 2 -> O
     """
 
+    __slots__ = ["table", "lines", "turn", "sequence", "winner"]
+
     def __init__(self):
         self.table = [[False for i in range(9)] for j in range(2)]
         horizontals = [[i + j for i in [0, 1, 2]] for j in range(0, 9, 3)]
