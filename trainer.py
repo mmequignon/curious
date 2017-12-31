@@ -52,8 +52,8 @@ class Trainer():
             # counters of victories for player one and two and for nil games
             one = two = nil = 0
             for leave in leaves:
-                if leave[1].isnumeric():
-                    if int(leave[1]) == 0:
+                if leave[-1].isnumeric():
+                    if int(leave[-1]) == 0:
                         one += 1
                     else:
                         two += 1
@@ -98,11 +98,11 @@ if __name__ == "__main__":
     chunks = chunker(trainer.dataset, chunk_size)
     for epoch, chunk in enumerate(chunks):
         current_loss = 0
-        for sequence, winner in chunk:
+        for sequence, seq_1, seq_2, winner in chunk:
             # Regarding the fact that each sequence of move provided by the
             # dataset represents an ended game, we must slice them.
             index = random.randrange(0, len(sequence) - 2)
-            root = sequence[index]
+            root = sequence[:index]
             game = trainer.get_game_from_sequence(root)
             branches = game.valid_moves()
             best_branch = trainer.best_branch(root, branches)
