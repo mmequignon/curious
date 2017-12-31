@@ -32,10 +32,16 @@ class Trainer():
         """Return all direct child of the parent given as argument.
         TODO : 0123 is also a child of 2301
         """
+        p1_moves = [parent[i] for i in range(len(parent)) if i % 2 == 0]
+        p2_moves = [parent[i] for i in range(len(parent)) if i % 2 == 1]
         regex = re.compile("%s[0-9]*" % (parent))
+        p1_regex = re.compile("[%s]{%s}[0-9]*" % (p1_moves, len(p1_moves)))
+        p2_regex = re.compile("[%s]{%s}[0-9]*" % (p2_moves, len(p2_moves)))
         if dataset is None:
             dataset = self.dataset
-        return [i for i in dataset if regex.match(i[0])]
+        return [i for i in dataset if (
+            regex.match(i[0]) or
+            (p1_regex.match(i[1]) and p2_regex.match(i[2])))]
 
     def best_branch(self, trunk, branches):
         """Depending on the parent given as argument, returns the best move.
