@@ -26,7 +26,7 @@ class Explorator():
             - third valud defines the Player 2 move sequence
             - fourth value defines the winner of the game (False if nil)
         """
-        tries = 1000000
+        tries = 100000
         filename = "data/tic-tac-toe-dataset.txt"
         with open(filename, "w") as f:
             for i in range(tries):
