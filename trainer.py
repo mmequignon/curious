@@ -28,9 +28,14 @@ class Trainer():
         self.trainset = self.dataset[:split_indice]
         self.testset = self.dataset[split_indice:]
 
-    def get_leaves(self, parent):
-        regex = re.compile("%s[0-9]+" % (parent))
-        return [i for i in self.dataset if regex.match(i[0])]
+    def get_leaves(self, parent, dataset=None):
+        """Return all direct child of the parent given as argument.
+        TODO : 0123 is also a child of 2301
+        """
+        regex = re.compile("%s[0-9]*" % (parent))
+        if dataset is None:
+            dataset = self.dataset
+        return [i for i in dataset if regex.match(i[0])]
 
     def best_branch(self, trunk, branches):
         """Depending on the parent given as argument, returns the best move.
@@ -40,8 +45,10 @@ class Trainer():
         childs = self.get_leaves(trunk)
         results = []
         for branch in branches:
-            regex = re.compile("%s[0-9]*" % (trunk + str(branch)))
-            leaves = [i for i in childs if regex.match(i[0])]
+            leaves = self.get_leaves(trunk + str(branch), childs)
+            if not leaves:
+                results.append((0, branch))
+                continue
             # counters of victories for player one and two and for nil games
             one = two = nil = 0
             for leave in leaves:
