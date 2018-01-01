@@ -1,7 +1,8 @@
 #!/home/pytorch/pytorch/sandbox/bin/python3
 
 import random
-import re
+import os
+from multiprocessing import Pool
 
 import torch
 import numpy
@@ -13,65 +14,55 @@ class Trainer():
 
     __slots__ = ["dataset", "trainset", "testset"]
 
+    def load_dataset(self, filename):
+        ratios = {}
+        with open(filename, "r") as f:
+            for line in f:
+                sequence, one, two, nil = line.split()
+                ratios[sequence] = {
+                    "one": int(one),
+                    "two": int(two),
+                    "nil": int(nil)
+                }
+        return ratios
+
     def __init__(self):
         """Gets each item from the dataset file and splits that dataset into
         two sets. One for training, one for testing.
         """
-        split_ratio = 0.0001
-        filename = "data/tic-tac-toe-dataset.txt"
-        self.dataset = []
-        with open(filename, "r") as f:
-            for line in f:
-                self.dataset.append(line.split())
-        random.shuffle(self.dataset)
-        split_indice = int(len(self.dataset) * split_ratio)
-        self.trainset = self.dataset[:split_indice]
-        self.testset = self.dataset[split_indice:]
-
-    def get_leaves(self, parent, dataset=None):
-        """Return all direct child of the parent given as argument.
-        TODO : 0123 is also a child of 2301
-        """
-        p1_moves = [parent[i] for i in range(len(parent)) if i % 2 == 0]
-        p2_moves = [parent[i] for i in range(len(parent)) if i % 2 == 1]
-        regex = re.compile("%s[0-9]*" % (parent))
-        p1_regex = re.compile("[%s]{%s}[0-9]*" % (p1_moves, len(p1_moves)))
-        p2_regex = re.compile("[%s]{%s}[0-9]*" % (p2_moves, len(p2_moves)))
-        if dataset is None:
-            dataset = self.dataset
-        return [i for i in dataset if (
-            regex.match(i[0]) or
-            (p1_regex.match(i[1]) and p2_regex.match(i[2])))]
+        filename = "data/tic-tac-toe-ratios-dataset.csv"
+        self.dataset = self.load_dataset(filename)
+        sequences = list(self.dataset.keys())
+        split_ratio = 0.8
+        split_indice = int(len(sequences) * split_ratio)
+        self.trainset = sequences[:split_indice]
+        self.testset = sequences[split_indice:]
 
     def best_branch(self, trunk, branches):
         """Depending on the parent given as argument, returns the best move.
         """
-        # TODO: For the moment, this method do not evaluates losses
-        # or nil options, in order to avoid a loss.
-        childs = self.get_leaves(trunk)
         results = []
         for branch in branches:
-            leaves = self.get_leaves(trunk + str(branch), childs)
-            if not leaves:
+            data = self.dataset.get(trunk + str(branch), None)
+            if data is None:
                 results.append((0, branch))
                 continue
             # counters of victories for player one and two and for nil games
-            one = two = nil = 0
-            for leave in leaves:
-                if leave[-1].isnumeric():
-                    if int(leave[-1]) == 0:
-                        one += 1
-                    else:
-                        two += 1
-                else:
-                    nil += 1
-            # If the current player is One, we must maximze victories of One
-            # else, Two.
-            current = len(trunk) % 2 == 0 and one or two
-            win = (current / len(leaves)) * 100
+            current = len(trunk) % 2 == 0 and "one" or "two"
+            qty = sum(list(data.values()))
+            win = (data[current] / qty) * 100
             results.append((win, branch))
         results.sort(reverse=True)
         return(int(results[0][-1]))
+
+    def train(self, trunk):
+        game = trainer.get_game_from_sequence(trunk)
+        branches = game.valid_moves()
+        choice = random.choice(branches)
+        best_branch = self.best_branch(trunk, branches)
+        game.representation()
+        print("best move is %s, choice : %s" % (best_branch, choice))
+        return choice == best_branch and 0 or 1
 
     def get_game_from_sequence(self, sequence):
         moves = [int(i) for i in sequence]
@@ -99,23 +90,19 @@ def chunker(data, size=2000):
 
 if __name__ == "__main__":
     trainer = Trainer()
-    chunk_size = 30
-    # Traning phase
-    chunks = chunker(trainer.dataset, chunk_size)
-    for epoch, chunk in enumerate(chunks):
-        current_loss = 0
-        for sequence, seq_1, seq_2, winner in chunk:
-            # Regarding the fact that each sequence of move provided by the
-            # dataset represents an ended game, we must slice them.
-            index = random.randrange(0, len(sequence) - 2)
-            root = sequence[:index]
-            game = trainer.get_game_from_sequence(root)
-            branches = game.valid_moves()
-            best_branch = trainer.best_branch(root, branches)
-            # TODO: for the moment, randomly selects branch.
-            choice = random.choice(branches)
-            if best_branch != choice:
-                current_loss += 1
-        rate = (current_loss / chunk_size) * 100
-        # TODO: output in a file, for pyplot.
-        print("iteration : %s, loss rate : %s" % (epoch, rate))
+    chunks = chunker(trainer.trainset)
+    with Pool(os.cpu_count()) as p:
+        slice_size = os.cpu_count()
+        for epoch, chunk in enumerate(chunks):
+            current_loss = 0
+            slices = chunker(chunk, slice_size)
+            for s in slices:
+                args = []
+                for i, sequence in enumerate(s):
+                    index = random.randrange(0, len(sequence) - 2)
+                    args.append("".join(sequence[:index]))
+                current_loss += sum(p.map(trainer.train, args))
+            rate = (current_loss / len(chunk)) * 100
+            print("epoch N°%s of size %s, loss = %s" % (
+                epoch, len(chunk), rate))
+            break

@@ -1,6 +1,7 @@
 #!/home/pytorch/pytorch/sandbox/bin/python3
 
 import random
+from itertools import permutations
 
 from tic_tac_toe import TicTacToe
 
@@ -17,28 +18,52 @@ class Explorator():
         if not game.game_is_over():
             self.explore(game)
 
+    def compute_games(self, tries):
+        games = []
+        for i in range(tries):
+            game = TicTacToe()
+            self.explore(game)
+            games.append((game.get_sequence(), str(game.winner)))
+        return games
+
+    def parse_games(self, games):
+        ratios = {}
+        for sequence, w in games:
+            if w.isnumeric():
+                winner = int(w)
+            else:
+                winner = 2
+            while sequence:
+                p1 = [sequence[i] for
+                      i in range(len(sequence)) if i % 2 == 0]
+                p2 = [sequence[i] for
+                      i in range(len(sequence)) if i % 2 == 1]
+                neighbours = []
+                for i in permutations(p1, len(p1)):
+                    for j in permutations(p2, len(p2)):
+                        neighbours.append("".join(
+                            [k % 2 == 0 and p1[k // 2] or p2[k // 2] for
+                             k in range(len(p1 + p2))]))
+                for neighbour in neighbours:
+                    if neighbour not in ratios:
+                        ratios[neighbour] = [0, 0, 0]
+                    ratios[neighbour][winner] += 1
+                sequence = sequence[:-1]
+        return ratios
+
+    def compute_ratios(self, games, out_filename):
+        ratios = self.parse_games(games)
+        with open(out_filename, "w") as f:
+            for sequence, ratio in ratios.items():
+                f.write(" ".join(
+                    [sequence, str(ratio[0]), str(ratio[1]), str(ratio[2])]) +
+                    "\n")
+
     def __init__(self):
-        """Make a number 'tries' of random games and store results in a file
-        'filename' formatted as followed :
-        012345678 02468 1357 1
-            - first value defines the game move sequence
-            - second value defines the player 1 move sequence
-            - third valud defines the Player 2 move sequence
-            - fourth value defines the winner of the game (False if nil)
-        """
-        tries = 100000
-        filename = "data/tic-tac-toe-dataset.txt"
-        with open(filename, "w") as f:
-            for i in range(tries):
-                game = TicTacToe()
-                self.explore(game)
-                sequence = game.get_sequence()
-                seq_1 = "".join(
-                    [sequence[i] for i in range(len(sequence)) if i % 2 == 0])
-                seq_2 = "".join(
-                    [sequence[i] for i in range(len(sequence)) if i % 2 == 1])
-                winner = str(game.winner)
-                f.write(" ".join([sequence, seq_1, seq_2, winner]) + "\n")
+        tries = 300000
+        ratios_filename = "data/tic-tac-toe-ratios-dataset.csv"
+        games = self.compute_games(tries)
+        self.compute_ratios(games, ratios_filename)
 
 
 if __name__ == "__main__":
