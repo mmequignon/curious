@@ -1,8 +1,6 @@
 #!/home/pytorch/pytorch/sandbox/bin/python3
 
 import random
-import os
-from multiprocessing import Pool
 
 import torch
 import numpy
@@ -60,8 +58,6 @@ class Trainer():
         branches = game.valid_moves()
         choice = random.choice(branches)
         best_branch = self.best_branch(trunk, branches)
-        game.representation()
-        print("best move is %s, choice : %s" % (best_branch, choice))
         return choice == best_branch and 0 or 1
 
     def get_game_from_sequence(self, sequence):
@@ -91,18 +87,16 @@ def chunker(data, size=2000):
 if __name__ == "__main__":
     trainer = Trainer()
     chunks = chunker(trainer.trainset)
-    with Pool(os.cpu_count()) as p:
-        slice_size = os.cpu_count()
-        for epoch, chunk in enumerate(chunks):
-            current_loss = 0
-            slices = chunker(chunk, slice_size)
-            for s in slices:
-                args = []
-                for i, sequence in enumerate(s):
-                    index = random.randrange(0, len(sequence) - 2)
-                    args.append("".join(sequence[:index]))
-                current_loss += sum(p.map(trainer.train, args))
-            rate = (current_loss / len(chunk)) * 100
-            print("epoch N°%s of size %s, loss = %s" % (
-                epoch, len(chunk), rate))
-            break
+    for epoch, chunk in enumerate(chunks):
+        current_loss = 0
+        args = []
+        for i, sequence in enumerate(chunk):
+            if len(sequence) < 3:
+                index = 0
+            else:
+                index = random.randrange(0, len(sequence) - 2)
+            root = "".join(sequence[:index])
+            current_loss += trainer.train(root)
+        rate = (current_loss / len(chunk)) * 100
+        print("epoch N°%s of size %s, loss = %s" % (
+            epoch, len(chunk), rate))
