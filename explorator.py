@@ -38,16 +38,14 @@ class Explorator():
                       i in range(len(sequence)) if i % 2 == 0]
                 p2 = [sequence[i] for
                       i in range(len(sequence)) if i % 2 == 1]
-                neighbours = []
                 for i in permutations(p1, len(p1)):
                     for j in permutations(p2, len(p2)):
-                        neighbours.append("".join(
+                        neighbour = "".join(
                             [k % 2 == 0 and p1[k // 2] or p2[k // 2] for
-                             k in range(len(p1 + p2))]))
-                for neighbour in neighbours:
-                    if neighbour not in ratios:
-                        ratios[neighbour] = [0, 0, 0]
-                    ratios[neighbour][winner] += 1
+                             k in range(len(p1 + p2))])
+                        if neighbour not in ratios:
+                            ratios[neighbour] = [0, 0, 0]
+                        ratios[neighbour][winner] += 1
                 sequence = sequence[:-1]
         return ratios
 
@@ -60,7 +58,7 @@ class Explorator():
                     "\n")
 
     def __init__(self):
-        tries = 300000
+        tries = 1000000
         ratios_filename = "data/tic-tac-toe-ratios-dataset.csv"
         games = self.compute_games(tries)
         self.compute_ratios(games, ratios_filename)
