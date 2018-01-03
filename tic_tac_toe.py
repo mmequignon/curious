@@ -63,7 +63,7 @@ class TicTacToe():
 
     def representation(self):
         separator = "-------"
-        player1_position = self.turn % 2 == 0 and 0 or 1
+        player1_position = self.turn % 2
         print(separator)
         for l in range(0, 9, 3):
             line = [self.table[player1_position][l+c] and "X" or
