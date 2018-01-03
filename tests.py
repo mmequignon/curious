@@ -70,30 +70,15 @@ class TestDataset(unittest.TestCase):
     def setUp(self):
         self.trainer = Trainer()
 
-    def test_correct_winner(self):
-        for i in range(20):
-            winner = False
-            game = TicTacToe()
-            index = random.randrange(0, len(self.trainer.dataset) - 1)
-            data = self.trainer.dataset[index]
-            if data[-1].isnumeric():
-                winner = int(data[-1])
-            moves = [int(m) for m in data[0]]
-            for move in moves:
-                game.move(move)
-                game.end_turn()
-            self.assertEqual(game.winner, winner)
-
     def test_sequences(self):
         for i in range(20):
             game = TicTacToe()
-            index = random.randrange(0, len(self.trainer.dataset) - 1)
-            data = self.trainer.dataset[index]
-            moves = [int(m) for m in data[0]]
+            key = random.choice(list(self.trainer.dataset.keys()))
+            moves = [int(m) for m in key]
             for move in moves:
                 game.move(move)
                 game.end_turn()
-            self.assertEqual(data[0], game.get_sequence())
+            self.assertEqual(key, game.get_sequence())
 
 
 if __name__ == '__main__':
