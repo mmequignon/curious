@@ -4,6 +4,7 @@ import random
 
 import torch
 import numpy
+from datetime import datetime
 
 from tic_tac_toe import TicTacToe
 
@@ -36,29 +37,41 @@ class Trainer():
         self.trainset = sequences[:split_indice]
         self.testset = sequences[split_indice:]
 
-    def best_branch(self, trunk, branches):
-        """Depending on the parent given as argument, returns the best move.
-        """
+    def evaluate(self, trunk, branches, _type="win"):
         results = []
+        current = (
+            _type == "nil" and "nil" or
+            len(trunk) % 2 == 0 and "one" or
+            "two")
         for branch in branches:
             data = self.dataset.get(trunk + str(branch), None)
             if data is None:
                 results.append((0, branch))
                 continue
             # counters of victories for player one and two and for nil games
-            current = len(trunk) % 2 == 0 and "one" or "two"
+            #  print(current, len(trunk), data)
             qty = sum(list(data.values()))
             win = (data[current] / qty) * 100
-            results.append((win, branch))
+            results.append((win, int(branch)))
         results.sort(reverse=True)
-        return(int(results[0][-1]))
+        return(results[0])
+
+    def best_branch(self, trunk, branches):
+        """Depending on the parent given as argument, returns the best move.
+        """
+        ratio_win, branch = self.evaluate(trunk, branches)
+        if ratio_win < 50:
+            ratio_nil, nil = self.evaluate(trunk, branches, "nil")
+            if ratio_nil > ratio_win:
+                branch = nil
+        return branch
 
     def train(self, trunk):
         game = trainer.get_game_from_sequence(trunk)
         branches = game.valid_moves()
         choice = random.choice(branches)
-        best_branch = self.best_branch(trunk, branches)
-        return choice == best_branch and 0 or 1
+        branch = self.best_branch(trunk, branches)
+        return choice == branch and 0 or 1
 
     def get_game_from_sequence(self, sequence):
         moves = [int(i) for i in sequence]
@@ -100,3 +113,13 @@ if __name__ == "__main__":
         rate = (current_loss / len(chunk)) * 100
         print("epoch N°%s of size %s, loss = %s" % (
             epoch, len(chunk), rate))
+    #  game = TicTacToe()
+    #  init = random.randrange(0, 2)
+    #  print(init)
+    #  game.representation()
+    #  while not game.game_is_over():
+    #      moves = game.valid_moves()
+    #      move = trainer.best_branch(game.get_sequence(), moves)
+    #      game.move(move)
+    #      game.end_turn()
+    #      game.representation()
