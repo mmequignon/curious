@@ -12,10 +12,10 @@ def plot(data_types, filename=None, grid=False):
     for data_type in data_types:
         data["plots"][data_type[0][0]] = get_data_template(data_type)
     pyplot.show()
-    if grid:
-        pyplot.grid()
     for plot_name, vals in data["plots"].items():
         pyplot.subplot(vals["id"])
+        if grid:
+            pyplot.grid()
         pyplot.xlabel(vals["x_label"])
         pyplot.ylabel(vals["y_label"])
         vals["axes"] = pyplot.gca()
