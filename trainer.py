@@ -71,7 +71,7 @@ class Trainer():
         branches = game.valid_moves()
         choice = random.choice(branches)
         branch = self.best_branch(trunk, branches)
-        return choice == branch and 0 or 1
+        return choice != branch and 1 or 0
 
     def get_game_from_sequence(self, sequence):
         moves = [int(i) for i in sequence]
