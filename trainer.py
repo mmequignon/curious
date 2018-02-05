@@ -4,9 +4,9 @@ import random
 
 import torch
 import numpy
-from datetime import datetime
 
 from tic_tac_toe import TicTacToe
+from utils import chunker, plot
 
 
 class Trainer():
@@ -93,26 +93,33 @@ class Trainer():
                 table[:, 1:, :2], table[:, 1:, 1:])
 
 
-def chunker(data, size=2000):
-    return [data[i:i+size] for i in range(0, len(data), size)]
-
-
 if __name__ == "__main__":
     trainer = Trainer()
     chunks = chunker(trainer.trainset)
-    for epoch, chunk in enumerate(chunks):
-        current_loss = 0
-        args = []
-        for i, sequence in enumerate(chunk):
-            if len(sequence) < 3:
-                index = 0
-            else:
-                index = random.randrange(0, len(sequence) - 2)
-            root = "".join(sequence[:index])
-            current_loss += trainer.train(root)
-        rate = (current_loss / len(chunk)) * 100
-        print("epoch N°%s of size %s, loss = %s" % (
-            epoch, len(chunk), rate))
+    plots = [
+        [("accuracy", "epoch"), (0, len(chunks)), (0, 100), 211],
+        [("loss", "epoch"), (0, len(chunks)), (0, 100), 212],
+    ]
+    with plot(plots, filename="plots/accuracy.png", grid=True) as p:
+        for epoch, chunk in enumerate(chunks):
+            current_loss = 0
+            args = []
+            for i, sequence in enumerate(chunk):
+                if len(sequence) < 3:
+                    index = 0
+                else:
+                    index = random.randrange(0, len(sequence) - 2)
+                root = "".join(sequence[:index])
+                current_loss += trainer.train(root)
+            loss = (current_loss / len(chunk)) * 100
+            accuracy = 100 - loss
+            new_values = {
+                "accuracy": {"x_data": epoch, "y_data": accuracy},
+                "loss": {"x_data": epoch, "y_data": loss},
+            }
+            p.update(new_values)
+            print("epoch N°%s of size %s, loss = %s" % (
+                epoch, len(chunk), loss))
     #  game = TicTacToe()
     #  init = random.randrange(0, 2)
     #  print(init)
