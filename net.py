@@ -1,26 +1,25 @@
 #!/home/pytorch/pytorch/sandbox/bin/python3
 
-import torch
-from torch import nn
-from torch.nn import functionnal
+from torch import nn, optim
+from torch.nn import functional
 
 
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(3, 3, 3)
-        self.split = self.split_tensor()
-        self.conv2 = nn.Conv2d(12, 12, 2)
-
-    def split_tensor(self):
-        def func(tensor):
-            return torch.cat(
-                tensor[:, :2, :2], tensor[:, :2, 1:],
-                tensor[:, 1:, :2], tensor[:, 1:, 1:])
-        return func
+        self.conv1 = nn.Conv2d(1, 36, 1)
+        self.conv2 = nn.Conv2d(36, 144, 2)
+        self.conv3 = nn.Conv2d(144, 36, 2)
+        self.linear = nn.Linear(36, 9)
+        self.softmax = nn.Softmax(1)
+        self.criterion = nn.CrossEntropyLoss()
+        self.optimizer = optim.SGD(self.parameters(), lr=0.01, momentum=0.7)
 
     def forward(self, x):
-        x = functionnal.max_pool2d(functionnal.relu(self.conv1(x)), (2, 2))
-        x = self.split(x)
-        x = functionnal.max_pool2d(functionnal.relu(self.conv2(x)), (2, 2))
+        x = functional.relu(self.conv1(x))
+        x = functional.relu(self.conv2(x))
+        x = functional.relu(self.conv3(x))
+        x = x.view(-1, 36)
+        x = functional.relu(self.linear(x))
+        x = self.softmax(x)
         return x
