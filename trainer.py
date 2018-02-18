@@ -74,49 +74,62 @@ class Trainer():
             game.end_turn()
         return game
 
-    def get_tensor_from_game(self, game):
-        #  one, two, none = [], [], []
-        #  for i in range(0, 9, 3):
-        #      line_one, line_two, line_none = [], [], []
-        #      for j in range(3):
-        #          if game.table[0][i+j]:
-        #              line_one.append(1)
-        #              line_two.append(0)
-        #              line_none.append(0)
-        #          elif game.table[1][i+j]:
-        #              line_one.append(0)
-        #              line_two.append(1)
-        #              line_none.append(0)
-        #          else:
-        #              line_one.append(0)
-        #              line_two.append(0)
-        #              line_none.append(1)
-        #      one.append(line_one)
-        #      two.append(line_two)
-        #      none.append(line_none)
-        #  array = []
-        #  array.append(one)
-        #  array.append(two)
-        #  array.append(none)
-        #  tensor = torch.Tensor([array])
+    def get_matrix_from_game(self, game):
         table = [
             [game.table[0][i + j] and 1 or game.table[1][i + j] and 2 or 0
              for i in range(3)] for j in range(0, 9, 3)]
-        tensor = torch.Tensor([[table]])
+        return [table]
+
+    def get_tensor_from_game(self, game):
+        table = self.get_matrix_from_game(game)
+        tensor = torch.Tensor([table])
         return Variable(tensor, requires_grad=True)
 
-    def get_tensor_from_branch(self, branch):
-        tensor = torch.LongTensor([branch])
-        return Variable(tensor)
-
-    def get_branch_from_tensor(self, variable):
+    def get_branch_from_tensor(self, tensor):
         best_val, best_index = 0, None
-        tensor = variable.data[0]
         for i, branch in enumerate(tensor):
             if branch > best_val:
                 best_val = branch
                 best_index = i
         return best_index
+
+    def get_data_from_chunk(self, chunk):
+        games = []
+        moves = []
+        valid_moves = []
+        for sequence in chunk:
+            if len(sequence) < 3:
+                index = 0
+            else:
+                index = random.randrange(0, len(sequence) - 2)
+            root = "".join(sequence[:index])
+            game = trainer.get_game_from_sequence(root)
+            branches = game.valid_moves()
+            best_branch = trainer.best_branch(root, branches)
+            games.append(trainer.get_matrix_from_game(game))
+            moves.append(best_branch)
+            valid_moves.append(game.valid_moves())
+        games = Variable(torch.Tensor(games))
+        moves = Variable(torch.LongTensor(moves))
+        return games, moves, valid_moves
+
+    def get_infos(self, correct_moves, tensors, valid_moves):
+        pairs = zip(correct_moves.data, tensors.data, valid_moves)
+        correct_count = 0
+        error_count = 0
+        four_count = 0
+        for target, tensor, moves in pairs:
+            guess = self.get_branch_from_tensor(tensor)
+            if target == guess:
+                correct_count += 1
+            if guess not in moves:
+                error_count += 1
+            if guess == 4:
+                four_count += 1
+        corrects = (correct_count / len(correct_moves)) * 100
+        errors = (error_count / len(correct_moves)) * 100
+        fours = (four_count / len(correct_moves)) * 100
+        return corrects, errors, fours
 
 
 if __name__ == "__main__":
@@ -124,68 +137,26 @@ if __name__ == "__main__":
     net = Net()
     chunks = chunker(trainer.trainset)
     plots = [
-        [("accuracy", "epoch"), (0, len(chunks)),
-         (0, 100), 221, "Correct moves rate"],
+        [("accuracy", "epoch"), (0, len(chunks)), (0, 100), 221, "Accuracy"],
         [("loss", "epoch"), (0, len(chunks)), (0, 3), 222, "Loss"],
-        [("wrong moves", "epoch"), (0, len(chunks)),
-         (0, 100), 223, "Invalid moves rate"],
-        [("4 moves", "epoch"), (0, len(chunks)),
-         (0, 100), 224, "4 moves rate"],
+        [("errors", "epoch"), (0, len(chunks)), (0, 100), 223, "Errors"],
+        [("fours", "epoch"), (0, len(chunks)), (0, 100), 224, "Fours"],
     ]
     with plot(plots, filename="plots/accuracy.png", grid=True) as p:
         for epoch, chunk in enumerate(chunks):
-            current_loss = 0.0
-            current_correctness = 0
-            current_wrong_moves = 0
-            current_4_moves = 0
-            for sequence in chunk:
-                net.optimizer.zero_grad()
-                if len(sequence) < 3:
-                    index = 0
-                else:
-                    index = random.randrange(0, len(sequence) - 2)
-                root = "".join(sequence[:index])
-                game = trainer.get_game_from_sequence(root)
-                branches = game.valid_moves()
-                best_branch = trainer.best_branch(root, branches)
-                correct_tensor = trainer.get_tensor_from_branch(best_branch)
-                tensor = trainer.get_tensor_from_game(game)
-                predicted_tensor = net.forward(tensor)
-                predicted_branch = trainer.get_branch_from_tensor(
-                    predicted_tensor)
-                loss = net.criterion(predicted_tensor, correct_tensor)
-                loss.backward()
-                net.optimizer.step()
-                current_loss += loss.data[0]
-                current_correctness += (
-                    predicted_branch == best_branch and 1 or 0)
-                current_wrong_moves += (
-                    predicted_branch not in game.valid_moves() and 1 or 0)
-                current_4_moves += (predicted_branch == 4 and 1 or 0)
-            loss = current_loss / len(chunk)
-            accuracy = (current_correctness / len(chunk)) * 100
-            wrong_moves = (current_wrong_moves / len(chunk)) * 100
-            four_moves = (current_4_moves / len(chunk)) * 100
+            games, moves, valid_moves = trainer.get_data_from_chunk(chunk)
+            out = net.forward(games)
+            loss = net.criterion(out, moves)
+            loss.backward()
+            net.optimizer.step()
+            accuracy, errors, fours = trainer.get_infos(
+                moves, out, valid_moves)
             new_values = {
                 "accuracy": {"x_data": epoch, "y_data": accuracy},
-                "loss": {"x_data": epoch, "y_data": loss},
-                "wrong moves": {"x_data": epoch, "y_data": wrong_moves},
-                "4 moves": {"x_data": epoch, "y_data": four_moves},
+                "loss": {"x_data": epoch, "y_data": loss.data[0]},
+                "errors": {"x_data": epoch, "y_data": errors},
+                "fours": {"x_data": epoch, "y_data": fours},
             }
             p.update(new_values)
-            print("epoch N°%s of size %s, loss = %s, accuracy = %s" % (
-                epoch, len(chunk), loss, accuracy))
-    game = TicTacToe()
-    while not game.game_is_over():
-        game.representation()
-        move = 9
-        while move not in game.valid_moves():
-            if game.turn % 2 == 1:
-                move = int(input("votre coup : "))
-            else:
-                move_tensor = net.forward(tensor)
-                move = trainer.get_branch_from_tensor(move_tensor)
-            if move not in game.valid_moves():
-                print("%s FAIL !" % move)
-        game.move(move)
-        game.end_turn()
+            print("epoch N°%s of size %s, loss = %s" % (
+                epoch, len(chunk), loss.data[0]))

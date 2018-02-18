@@ -39,8 +39,8 @@ class Plot():
             template["color"] = "g-"
         if data_type[0][0] == "loss":
             template["color"] = "r-"
-        if data_type[0][0] == "wrong moves":
+        if data_type[0][0] == "errors":
             template["color"] = "b-"
-        if data_type[0][0] == "4 moves":
+        if data_type[0][0] == "fours":
             template["color"] = "k-"
         return template
