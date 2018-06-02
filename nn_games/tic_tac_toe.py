@@ -1,12 +1,11 @@
 #!/home/pytorch/pytorch/sandbox/bin/python3
 
+import random
 from copy import deepcopy
 
 import torch
 from torch import nn
 from torch.nn import functional
-
-from config import cuda_available
 
 
 class Game():
@@ -51,13 +50,20 @@ class Game():
         return False
 
     def no_moves_left(self):
-        return self.turn == 9
-        #  return all(self.table[case] != 0 for case in range(9))
+        return all(self.table[case] != 0 for case in range(9))
 
     def valid_moves(self):
-        """Return all positions where there is no piece.
+        """Return a vector containing wether 1 or 0 depending on the
+        positions validities.
+        example : [0, 1, 0, 1, 0, 1, 0, 1, 0]
         """
         return [i == 0 and 1 or 0 for i in self.table]
+
+    def valid_actions(self):
+        """Returns a vector containing valid actions.
+        example : [1, 3, 8]
+        """
+        return [i for i in range(Game.game_moves_vector) if self.table[i] == 0]
 
     def get_board(self):
         """Return a tensor of the form 3*3*3.
@@ -69,13 +75,9 @@ class Game():
         board = []
         for column in range(0, 9, 3):
             board.append(self.table[column:column + 3])
-        board = torch.FloatTensor(board)
-        if cuda_available:
-            board.cuda()
         return board
 
     def end_turn(self):
-        self.turn += 1
         if self.game_is_won() or self.no_moves_left():
             self.game_is_over = True
             if self.game_is_won():
@@ -84,8 +86,8 @@ class Game():
                     self.reward = 1
                 elif self.winner == 2:
                     self.reward = -1
-            else:
-                self.winner = 0
+        else:
+            self.turn += 1
 
     def move(self, case):
         self.table[case] = self.get_current_player()
@@ -105,53 +107,71 @@ class Game():
             print("|%s|%s|%s|" % (line[0], line[1], line[2]))
             print(separator)
 
-    @staticmethod
-    def copy(game):
-        return deepcopy(game)
+    def copy(self):
+        return deepcopy(self)
 
 
 class Net(nn.Module):
-    def __init__(self, game):
+    def __init__(self):
         super(Net, self).__init__()
-        self.board_x, self.board_y = game.game_size
-        self.vector_length = game.game_moves_vector
+        self.board_x, self.board_y = Game.game_size
+        self.vector_length = Game.game_moves_vector
         self.conv1 = nn.Conv2d(1, 512, 3, stride=1, padding=1)
         self.conv2 = nn.Conv2d(512, 512, 3, stride=1, padding=1)
+        self.conv3 = nn.Conv2d(512, 512, 3)
         self.bn1 = nn.BatchNorm2d(512)
         self.bn2 = nn.BatchNorm2d(512)
         self.fc1 = nn.Linear(512, 1024)
         self.fc_bn1 = nn.BatchNorm1d(1024)
         self.fc2 = nn.Linear(1024, 512)
         self.fc_bn2 = nn.BatchNorm1d(512)
-        self.fc3 = nn.Linear(512, self.vector_length)
+        self.fc3 = nn.Linear(512, 9)
         self.fc4 = nn.Linear(512, 1)
 
     def value_head(self, s):
-        return self.fc4(s)
+        v = self.fc4(s)
+        return v
 
     def pi_head(self, s):
         s = self.fc3(s)
-        return functional.log_softmax(s, dim=1)
+        return functional.softmax(s, dim=-1)
 
     def dropout_layers(self, s):
         s = functional.dropout(
-            functional.relu(self.fc_bn1(self.fc1(s))),
-            p=0.3, training=self.training)
+            functional.relu(self.fc1(s)), p=0.3, training=self.training)
         s = functional.dropout(
-            functional.relu(self.fc_bn2(self.fc2(s))),
-            p=0.3, training=self.training)
+            functional.relu(self.fc2(s)), p=0.3, training=self.training)
         return s
 
     def convolution_layers(self, s):
         s = functional.relu(self.bn1(self.conv1(s)))
         s = functional.relu(self.bn2(self.conv2(s)))
+        s = functional.relu(self.conv3(s))
+        s = s.view(-1, 512)
         return s
 
     def forward(self, s):
         s = s.view(-1, 1, self.board_x, self.board_y)
         s = self.convolution_layers(s)
-        s = s.view(-1, 512)
         s = self.dropout_layers(s)
         pi = self.pi_head(s)
         v = self.value_head(s)
+        print(pi)
         return pi, v
+
+    def compute_loss(self, predicted_pis, pis, predicted_rewards, rewards):
+        """Computes mean-squared loss for rewards and 1G"""
+        size = predicted_pis.size()[0]
+        pi_loss = torch.sum(pis * predicted_pis) / size
+        v_loss = torch.sum((rewards - predicted_rewards)**2) / size
+        return pi_loss - v_loss
+
+
+if __name__ == "__main__":
+    game = Game()
+    game.representation()
+    while not game.game_is_over:
+        move = random.choice(game.valid_actions())
+        game.move(move)
+        game.representation()
+    print(game.winner)

@@ -1,8 +1,13 @@
 #!/home/pytorch/pytorch/sandbox/bin/python3
 
+import logging
+import pickle
 from plot import Plot
 from matplotlib import pyplot
 from contextlib import contextmanager
+
+from nn_games.tic_tac_toe import Game, Net
+from config import cuda_available
 
 
 @contextmanager
@@ -31,3 +36,33 @@ def plot(data_types, filename=None, grid=False):
 
 def chunker(data, size=2000):
     return [data[i:i+size] for i in range(0, len(data), size)]
+
+
+def save_net_parameters(net):
+    with open("nets/%s-net" % Game.name, "wb") as f:
+        pickle.dump(net, f)
+
+
+def load_net_parameters():
+    try:
+        f = open("nets/%s-net" % Game.name, "rb")
+        net = pickle.load(f)
+    except OSError:
+        net = Net()
+    if cuda_available:
+        net.cuda()
+    return net
+
+
+def get_logger():
+    logger = logging.getLogger(__name__)
+    logger.setLevel("INFO")
+    formatter = logging.Formatter('[%(levelname)s]  %(message)s')
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(logging.DEBUG)
+    stream_handler.setFormatter(formatter)
+    logger.addHandler(stream_handler)
+    return logger
+
+
+logger = get_logger()
